@@ -1,3 +1,4 @@
+### everything is subject to be changed soon.
 # 💼 Smart Ledger
 
 **A lightweight, offline-first accounting app**  
