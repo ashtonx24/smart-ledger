@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Shop Dashboard</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 40px;
+        background: #f0f0f0;
+        color: #333;
+      }
+      .container {
+        max-width: 600px;
+        margin: auto;
+        background: #fff;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      }
+      h2 {
+        margin-bottom: 20px;
+        text-align: center;
+      }
+      button {
+        width: 100%;
+        padding: 12px;
+        margin-bottom: 15px;
+        font-size: 16px;
+        font-weight: bold;
+        color: white;
+        background-color: #28a745;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      button:hover {
+        background-color: #218838;
+      }
+      .status {
+        margin-top: 20px;
+        font-style: italic;
+        color: #555;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h2 id="shop-title">Shop Dashboard</h2>
+      <button onclick="createTable('sales')">Create Sales Table</button>
+      <button onclick="createTable('income')">Create Income Table</button>
+      <button onclick="createTable('expense')">Create Expense Table</button>
+      <div class="status" id="status-msg"></div>
+    </div>
+
+    <!-- <script>
+      // Extract shop_name from URL
+      const shopName = window.location.pathname.split("/").pop().toLowerCase();
+
+      document.title = `Shop: ${shopName}`;
+      document.getElementById(
+        "shop-title"
+      ).textContent = `Dashboard – ${shopName}`;
+
+      async function createTable(type) {
+        try {
+          const res = await fetch(`/shops/${shopName}/create-table`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Database-Name": getHeaders(),
+            },
+            body: JSON.stringify({ table_type: type }),
+          });
+
+          const result = await res.json();
+          if (res.ok) {
+            document.getElementById(
+              "status-msg"
+            ).textContent = `✅ '${type}' table created successfully.`;
+          } else {
+            document.getElementById(
+              "status-msg"
+            ).textContent = `❌ Error: ${result.detail}`;
+          }
+        } catch (err) {
+          document.getElementById(
+            "status-msg"
+          ).textContent = `❌ Network error or server issue.`;
+        }
+      }
+    </script> -->
+    <script src="/static/script.js"></script>
+  </body>
+</html>

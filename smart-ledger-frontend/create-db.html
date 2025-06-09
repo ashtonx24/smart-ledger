@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Create New Database (Shop)</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 40px;
+        background: #f9f9f9;
+        color: #222;
+      }
+      .container {
+        max-width: 400px;
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+      }
+      label,
+      input,
+      button {
+        display: block;
+        width: 100%;
+        margin-bottom: 16px;
+      }
+      input {
+        padding: 8px;
+        font-size: 1rem;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+      }
+      button {
+        background: #28a745;
+        color: white;
+        font-weight: bold;
+        border: none;
+        padding: 10px;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #218838;
+      }
+      .status {
+        margin-top: 12px;
+        font-style: italic;
+        color: #155724;
+      }
+      .error {
+        color: #721c24;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h2>Create New Shop Database</h2>
+      <label for="shop-name">Shop Name:</label>
+      <input
+        type="text"
+        id="shop-name"
+        placeholder="Enter new shop name"
+        required
+      />
+      <button id="create-btn">Create Database</button>
+      <div class="status" id="status-msg"></div>
+    </div>
+
+    <!-- <script>
+      const createBtn = document.getElementById("create-btn");
+      const shopNameInput = document.getElementById("shop-name");
+      const statusMsg = document.getElementById("status-msg");
+
+      createBtn.addEventListener("click", async () => {
+        const shopName = shopNameInput.value.trim();
+        if (!shopName) {
+          statusMsg.textContent = "Please enter a shop name.";
+          statusMsg.classList.add("error");
+          return;
+        }
+        statusMsg.textContent = "Creating database...";
+        statusMsg.classList.remove("error");
+
+        try {
+          const response = await fetch("/shops", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Database-Name": getHeaders(),
+            },
+            body: JSON.stringify({ name: shopName, owner: "default_owner" }), // you can modify owner
+          });
+          const data = await response.json();
+
+          if (response.ok) {
+            statusMsg.textContent = `Success! Database created: ${data.database}`;
+            statusMsg.classList.remove("error");
+            shopNameInput.value = "";
+          } else {
+            statusMsg.textContent = `Error: ${data.detail || "Unknown error"}`;
+            statusMsg.classList.add("error");
+          }
+        } catch (err) {
+          statusMsg.textContent = "Network error. Please try again.";
+          statusMsg.classList.add("error");
+        }
+      });
+    </script> -->
+    <script src="/static/script.js"></script>
+  </body>
+</html>
