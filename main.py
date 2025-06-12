@@ -1,21 +1,38 @@
+import bcrypt
+import jwt
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Query, Request, Header, Depends
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, HTMLResponse  # HTMLResponse moved here
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from pydantic import BaseModel, Field
-from typing import Literal
+from typing import Literal, List
 import pyodbc
 from fpdf import FPDF
 import datetime
+from datetime import timedelta, datetime
 import os
 from enum import Enum
 from dotenv import load_dotenv
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+import re
+
 
 # Load environment variables
 load_dotenv()
+
+SECRET_KEY = "your_super_secret_key"
+JWT_ALGORITHM = "HS256"
+JWT_EXPIRATION_MINUTES = 30
+
+class UserCreate(BaseModel):
+    username: str
+    password: str
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
 
 # --- APScheduler background jobs setup ---
 scheduler = AsyncIOScheduler()
@@ -83,6 +100,14 @@ async def create_db():
 async def shop_page(shop_name: str):
     return FileResponse(Path("smart-ledger-frontend/shop/shop.html"))
 
+@app.get("/shop/{shop_name}/dynamic-table")
+async def dynamic_table_page(shop_name: str):
+    return FileResponse(Path("smart-ledger-frontend/dynamic-table.html"))
+
+@app.get("/login")
+async def login_page():
+    return FileResponse(Path("smart-ledger-frontend/login.html"))
+
 @app.exception_handler(404)
 async def custom_404_handler(request: Request, exc):
     return FileResponse("smart-ledger-frontend/select-db.html")
@@ -107,6 +132,15 @@ def get_selected_db(x_database_name: str = Header(None)):
 class ShopCreate(BaseModel):
     name: str
     owner: str
+
+class ColumnDefinition(BaseModel):
+    name: str
+    type: str
+    constraints: List[str] = []
+
+class TableCreateRequest(BaseModel):
+    table_name: str
+    columns: List[ColumnDefinition]
 
 @app.post("/shops")
 async def create_shop(shop: ShopCreate):
@@ -167,6 +201,83 @@ async def create_table(
         return {"status": "success", "table_created": table_type}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error creating table: {e}")
+
+@app.post("/shops/{shop_name}/create-dynamic-table")
+async def create_dynamic_table(
+    shop_name: str,
+    request: TableCreateRequest,
+    db_name: str = Depends(get_selected_db)
+):
+    # Validate table and column names
+    if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", request.table_name):
+        raise HTTPException(400, "Invalid table name")
+    for col in request.columns:
+        if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", col.name):
+            raise HTTPException(400, f"Invalid column name: {col.name}")
+
+    # Whitelist allowed types
+    allowed_types = {"INT", "VARCHAR", "TEXT", "DATE", "FLOAT", "BOOLEAN"}
+    for col in request.columns:
+        if col.type.upper() not in allowed_types:
+            raise HTTPException(400, f"Invalid type: {col.type}")
+
+    columns_sql = ", ".join(
+        [f"{col.name} {col.type.upper()} {' '.join(col.constraints)}".strip()
+         for col in request.columns]
+    )
+    sql = f"CREATE TABLE {request.table_name} ({columns_sql})"
+    try:
+        with pyodbc.connect(build_conn_str(db_name)) as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql)
+            conn.commit()
+        return {"status": "success", "sql": sql}
+    except Exception as e:
+        raise HTTPException(500, f"Table creation failed: {str(e)}")
+
+@app.post("/shops/{shop_name}/register-admin")
+async def register_admin(shop_name: str, user: UserCreate):
+    password_hash = bcrypt.hashpw(user.password.encode(), bcrypt.gensalt()).decode()
+    with pyodbc.connect(build_conn_str(shop_name)) as conn:
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)", (user.username, password_hash))
+        conn.commit()
+    return {"status": "admin created"}
+
+@app.post("/login")
+async def login(shop_name: str, creds: UserLogin):
+    with pyodbc.connect(build_conn_str(shop_name)) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT password_hash FROM users WHERE username = ?", (creds.username,))
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(401, "Invalid username or password")
+        password_hash = row[0]
+        if not bcrypt.checkpw(creds.password.encode(), password_hash.encode()):
+            raise HTTPException(401, "Invalid username or password")
+    # Issue JWT
+    payload = {
+        "shop_name": shop_name,
+        "username": creds.username,
+        "exp": datetime.utcnow() + timedelta(minutes=JWT_EXPIRATION_MINUTES)
+    }
+    token = jwt.encode(payload, SECRET_KEY, algorithm=JWT_ALGORITHM)
+    return {"access_token": token}
+
+def verify_token(authorization: str = Header(...)):
+    try:
+        scheme, token = authorization.split()
+        if scheme.lower() != "bearer":
+            raise Exception()
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[JWT_ALGORITHM])
+        return payload  # contains shop_name, username, exp
+    except Exception:
+        raise HTTPException(401, "Invalid or expired token")
+
+@app.get("/protected-resource")
+async def protected_route(user=Depends(verify_token)):
+    # user["shop_name"], user["username"] available here
+    return {"message": "You are authenticated!"}
 
 @app.get("/shops")
 async def list_shops():

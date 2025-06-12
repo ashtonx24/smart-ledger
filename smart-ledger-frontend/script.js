@@ -1,8 +1,23 @@
+function requireAuth() {
+  const publicPaths = ["/register", "/login", "/select-db"];
+  const isPublic = publicPaths.some(p => window.location.pathname.startsWith(p));
+  
+  if (!isPublic && !localStorage.getItem("access_token")) {
+    window.location.href = "/login";
+  }
+}
+requireAuth(); // run this at the top
+
 function getHeaders() {
-  return {
+  const token = localStorage.getItem("access_token");
+  const headers = {
     "Content-Type": "application/json",
     "X-Database-Name": localStorage.getItem("selectedDatabase") || "Practice"
   };
+  if (token) {
+    headers["Authorization"] = "Bearer " + token;
+  }
+  return headers;
 }
 
 function setStatus(message, isError = false) {
@@ -136,4 +151,219 @@ document.addEventListener("DOMContentLoaded", () => {
   handleDatabaseSelectionPage();
   handleCreateDbPage();
   handleShopDashboard();
+});
+
+// ===== Dynamic Table Creation Logic =====
+
+function handleDynamicTablePage() {
+  const tableNameInput = document.getElementById("table-name");
+  const columnsTbody = document.getElementById("columns-tbody");
+  const addColumnBtn = document.getElementById("add-column-btn");
+  const createTableBtn = document.getElementById("create-table-btn");
+  const sqlPreview = document.getElementById("sql-preview");
+  const statusMsg = document.getElementById("status-msg");
+
+  if (!tableNameInput || !columnsTbody || !addColumnBtn || !createTableBtn) return;
+
+  // Supported types
+  const dataTypes = ["INT", "VARCHAR(255)", "TEXT", "DATE", "FLOAT", "BOOLEAN"];
+
+  // Initial state
+  let columns = [
+    { name: "", type: "INT", pk: false, notNull: false, unique: false }
+  ];
+
+  function renderColumns() {
+    columnsTbody.innerHTML = "";
+    columns.forEach((col, idx) => {
+      const row = document.createElement("tr");
+
+      // Name
+      const nameTd = document.createElement("td");
+      const nameInput = document.createElement("input");
+      nameInput.type = "text";
+      nameInput.value = col.name;
+      nameInput.oninput = (e) => { columns[idx].name = e.target.value; updateSQLPreview(); };
+      nameTd.appendChild(nameInput);
+
+      // Type
+      const typeTd = document.createElement("td");
+      const typeSelect = document.createElement("select");
+      dataTypes.forEach(type => {
+        const opt = document.createElement("option");
+        opt.value = type;
+        opt.textContent = type;
+        if (col.type === type) opt.selected = true;
+        typeSelect.appendChild(opt);
+      });
+      typeSelect.onchange = (e) => { columns[idx].type = e.target.value; updateSQLPreview(); };
+      typeTd.appendChild(typeSelect);
+
+      // PK
+      const pkTd = document.createElement("td");
+      const pkCheckbox = document.createElement("input");
+      pkCheckbox.type = "checkbox";
+      pkCheckbox.checked = col.pk;
+      pkCheckbox.onchange = (e) => { columns[idx].pk = e.target.checked; updateSQLPreview(); };
+      pkTd.appendChild(pkCheckbox);
+
+      // Not Null
+      const nnTd = document.createElement("td");
+      const nnCheckbox = document.createElement("input");
+      nnCheckbox.type = "checkbox";
+      nnCheckbox.checked = col.notNull;
+      nnCheckbox.onchange = (e) => { columns[idx].notNull = e.target.checked; updateSQLPreview(); };
+      nnTd.appendChild(nnCheckbox);
+
+      // Unique
+      const uqTd = document.createElement("td");
+      const uqCheckbox = document.createElement("input");
+      uqCheckbox.type = "checkbox";
+      uqCheckbox.checked = col.unique;
+      uqCheckbox.onchange = (e) => { columns[idx].unique = e.target.checked; updateSQLPreview(); };
+      uqTd.appendChild(uqCheckbox);
+
+      // Remove
+      const removeTd = document.createElement("td");
+      if (columns.length > 1) {
+        const removeBtn = document.createElement("button");
+        removeBtn.textContent = "Remove";
+        removeBtn.className = "btn btn-remove";
+        removeBtn.onclick = () => { columns.splice(idx, 1); renderColumns(); updateSQLPreview(); };
+        removeTd.appendChild(removeBtn);
+      }
+
+      row.appendChild(nameTd);
+      row.appendChild(typeTd);
+      row.appendChild(pkTd);
+      row.appendChild(nnTd);
+      row.appendChild(uqTd);
+      row.appendChild(removeTd);
+
+      columnsTbody.appendChild(row);
+    });
+  }
+
+  function updateSQLPreview() {
+    const tableName = tableNameInput.value.trim() || "table_name";
+    const colDefs = columns.map(col => {
+      let def = `${col.name || "col"} ${col.type}`;
+      if (col.pk) def += " PRIMARY KEY";
+      if (col.notNull) def += " NOT NULL";
+      if (col.unique) def += " UNIQUE";
+      return def;
+    });
+    sqlPreview.textContent = `CREATE TABLE ${tableName} (${colDefs.join(", ")});`;
+  }
+
+  addColumnBtn.onclick = () => {
+    columns.push({ name: "", type: "INT", pk: false, notNull: false, unique: false });
+    renderColumns();
+    updateSQLPreview();
+  };
+
+  tableNameInput.oninput = updateSQLPreview;
+
+  createTableBtn.onclick = async () => {
+    statusMsg.textContent = "";
+    statusMsg.classList.remove("error");
+
+    const tableName = tableNameInput.value.trim();
+    if (!tableName) {
+      statusMsg.textContent = "Table name required.";
+      statusMsg.classList.add("error");
+      return;
+    }
+    if (columns.some(col => !col.name)) {
+      statusMsg.textContent = "All columns must have a name.";
+      statusMsg.classList.add("error");
+      return;
+    }
+
+    // Prepare payload
+    const payload = {
+      table_name: tableName,
+      columns: columns.map(col => ({
+        name: col.name,
+        type: col.type,
+        constraints: [
+          ...(col.pk ? ["PRIMARY KEY"] : []),
+          ...(col.notNull ? ["NOT NULL"] : []),
+          ...(col.unique ? ["UNIQUE"] : [])
+        ]
+      }))
+    };
+
+    // Get shop name from URL (assuming /shop/{shop_name}/dynamic-table)
+    const pathParts = window.location.pathname.split("/");
+    const shopName = pathParts[pathParts.indexOf("shop") + 1];
+
+    try {
+      const res = await fetch(`/shops/${shopName}/create-dynamic-table`, {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        statusMsg.textContent = `✅ Table created! SQL: ${data.sql}`;
+        statusMsg.classList.remove("error");
+      } else {
+        statusMsg.textContent = `❌ Error: ${data.detail || "Unknown error"}`;
+        statusMsg.classList.add("error");
+      }
+    } catch (err) {
+      statusMsg.textContent = "❌ Network/server error.";
+      statusMsg.classList.add("error");
+    }
+  };
+
+  // Initial render
+  renderColumns();
+  updateSQLPreview();
+}
+
+// Add to your DOMContentLoaded handler:
+document.addEventListener("DOMContentLoaded", () => {
+  // ...existing handlers
+  handleDynamicTablePage();
+});
+
+function handleLoginPage() {
+  const shopInput = document.getElementById("shop-name");
+  const userInput = document.getElementById("username");
+  const passInput = document.getElementById("password");
+  const btn = document.getElementById("login-btn");
+  const status = document.getElementById("login-status");
+  if (!btn) return;
+
+  btn.onclick = async () => {
+    status.textContent = "Logging in...";
+    try {
+      const res = await fetch(`/login?shop_name=${encodeURIComponent(shopInput.value)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: userInput.value,
+          password: passInput.value
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        localStorage.setItem("access_token", data.access_token);
+        status.textContent = "Login successful!";
+        // Redirect to dashboard
+        window.location.href = `/shop/${shopInput.value}`;
+      } else {
+        status.textContent = data.detail || "Login failed";
+      }
+    } catch {
+      status.textContent = "Network error.";
+    }
+  };
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  handleLoginPage();
+  // ...other handlers
 });

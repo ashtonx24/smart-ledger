@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Register Shop</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 40px;
+        background: #f9f9f9;
+        color: #222;
+      }
+      .container {
+        max-width: 400px;
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+      }
+      label,
+      input,
+      button {
+        display: block;
+        width: 100%;
+        margin-bottom: 16px;
+      }
+      input {
+        padding: 8px;
+        font-size: 1rem;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+      }
+      button {
+        background: #007bff;
+        color: white;
+        font-weight: bold;
+        border: none;
+        padding: 10px;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #0056b3;
+      }
+      .status {
+        margin-top: 12px;
+        font-style: italic;
+        color: #155724;
+      }
+      .error {
+        color: #721c24;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h2>Register New Shop</h2>
+      <form id="register-form">
+        <label for="username">Shop Username:</label>
+        <input
+          type="text"
+          id="username"
+          placeholder="e.g. amalfashion"
+          required
+        />
+
+        <label for="password">Password:</label>
+        <input type="password" id="password" required />
+
+        <button type="submit">Register</button>
+      </form>
+      <div class="status" id="status-msg"></div>
+    </div>
+
+    <script>
+      document.getElementById("register-form").onsubmit = async (e) => {
+        e.preventDefault();
+        const username = document.getElementById("username").value.trim();
+        const password = document.getElementById("password").value.trim();
+        const status = document.getElementById("status-msg");
+
+        if (!username || !password) {
+          status.textContent = "Both fields required.";
+          status.className = "status error";
+          return;
+        }
+
+        status.textContent = "Registering...";
+        status.className = "status";
+
+        try {
+          const res = await fetch("/register-shop", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password }),
+          });
+
+          const data = await res.json();
+          if (res.ok) {
+            localStorage.setItem("access_token", data.access_token);
+            localStorage.setItem("selectedDatabase", data.database);
+            status.textContent = "✅ Shop registered!";
+            status.className = "status";
+            window.location.href = `/shop/${username}`;
+          } else {
+            status.textContent = data.detail || "❌ Registration failed.";
+            status.className = "status error";
+          }
+        } catch {
+          status.textContent = "❌ Network error.";
+          status.className = "status error";
+        }
+      };
+    </script>
+  </body>
+</html>

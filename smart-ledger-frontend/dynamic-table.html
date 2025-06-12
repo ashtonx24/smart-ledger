@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Create Dynamic Table</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f5f5f5; margin: 40px; }
+    .container { max-width: 600px; margin: auto; background: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);}
+    .columns-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+    .columns-table th, .columns-table td { border: 1px solid #ddd; padding: 8px; }
+    .columns-table th { background: #f0f0f0; }
+    .btn { padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer; }
+    .btn-add { background: #007bff; color: #fff; }
+    .btn-remove { background: #dc3545; color: #fff; }
+    .btn-create { background: #28a745; color: #fff; width: 100%; margin-top: 16px; }
+    .status { margin-top: 16px; font-style: italic; }
+    .error { color: #c00; }
+    .sql-preview { background: #eee; padding: 10px; font-family: monospace; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Create Dynamic Table</h2>
+    <label for="table-name">Table Name:</label>
+    <input type="text" id="table-name" placeholder="Enter table name" required />
+
+    <h3>Columns</h3>
+    <table class="columns-table" id="columns-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>PK</th>
+          <th>Not Null</th>
+          <th>Unique</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="columns-tbody">
+        <!-- Columns will be rendered here -->
+      </tbody>
+    </table>
+    <button type="button" class="btn btn-add" id="add-column-btn">Add Column</button>
+
+    <h4>SQL Preview:</h4>
+    <div class="sql-preview" id="sql-preview"></div>
+
+    <button class="btn btn-create" id="create-table-btn">Create Table</button>
+    <div class="status" id="status-msg"></div>
+  </div>
+
+  <script src="/static/script.js"></script>
+</body>
+</html>
